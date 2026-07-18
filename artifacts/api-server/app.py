@@ -740,6 +740,84 @@ def get_market_overview():
 
     return jsonify({'items': items, 'updatedAt': datetime.utcnow().isoformat()})
 
+# ── Indian stocks cache ─────────────────────────────────────────────────────
+_indian_cache: dict = {'data': None, 'ts': 0.0}
+_INDIAN_TTL = 45  # seconds
+
+@app.route('/api/stocks/indian')
+def get_indian_stocks():
+    """Batch-fetch live prices + 7-day sparklines for all major Indian NSE stocks."""
+    import pandas as pd
+
+    now = time.time()
+    if _indian_cache['data'] and (now - _indian_cache['ts']) < _INDIAN_TTL:
+        return jsonify(_indian_cache['data'])
+
+    symbols = [
+        'HDFCBANK.NS','ICICIBANK.NS','SBIN.NS','AXISBANK.NS','KOTAKBANK.NS',
+        'INDUSINDBK.NS','BAJFINANCE.NS','BAJAJFINSV.NS',
+        'TCS.NS','INFY.NS','WIPRO.NS','HCLTECH.NS','TECHM.NS','LTIM.NS','PERSISTENT.NS',
+        'RELIANCE.NS','ONGC.NS','BPCL.NS','IOC.NS','GAIL.NS','NTPC.NS','POWERGRID.NS',
+        'TATAPOWER.NS','ADANIGREEN.NS','ADANIPOWER.NS',
+        'MARUTI.NS','TATAMOTORS.NS','M&M.NS','HEROMOTOCO.NS','BAJAJ-AUTO.NS','EICHERMOT.NS',
+        'HINDUNILVR.NS','ITC.NS','NESTLEIND.NS','BRITANNIA.NS','DABUR.NS','GODREJCP.NS','TATACONSUM.NS',
+        'SUNPHARMA.NS','DRREDDY.NS','CIPLA.NS','DIVISLAB.NS','LUPIN.NS','AUROPHARMA.NS',
+        'LT.NS','SIEMENS.NS','ABB.NS','CUMMINSIND.NS',
+        'BHARTIARTL.NS','IDEA.NS',
+        'ULTRACEMCO.NS','SHREECEM.NS','ACC.NS','AMBUJACEM.NS',
+        'TATASTEEL.NS','JSWSTEEL.NS','HINDALCO.NS','COALINDIA.NS','VEDL.NS',
+        'LICI.NS','SBILIFE.NS','HDFCLIFE.NS','ICICIPRULI.NS',
+        'ADANIENT.NS','ADANIPORTS.NS','ADANIENSOL.NS','ATGL.NS',
+    ]
+
+    yf = get_yfinance()
+    results: dict = {}
+
+    if yf:
+        try:
+            data = yf.download(
+                symbols, period='10d', interval='1d',
+                progress=False, group_by='ticker', auto_adjust=True,
+            )
+            for sym in symbols:
+                try:
+                    if len(symbols) == 1:
+                        df = data
+                    else:
+                        lvl0 = data.columns.get_level_values(0)
+                        df = data[sym] if sym in lvl0 else None
+                    if df is None or (hasattr(df, 'empty') and df.empty):
+                        continue
+                    closes  = df['Close'].dropna()
+                    volumes = df['Volume'].dropna() if 'Volume' in df else pd.Series(dtype=float)
+                    if len(closes) < 2:
+                        continue
+                    price    = float(closes.iloc[-1])
+                    prev     = float(closes.iloc[-2])
+                    chg_pct  = (price - prev) / prev * 100 if prev else 0
+                    volume   = int(volumes.iloc[-1]) if len(volumes) > 0 else 0
+                    sparkline = [round(float(v), 2) for v in closes.tail(7).tolist()]
+                    results[sym] = {
+                        'price': round(price, 2),
+                        'previousClose': round(prev, 2),
+                        'changePercent': round(chg_pct, 2),
+                        'volume': volume,
+                        'sparkline': sparkline,
+                    }
+                except Exception:
+                    pass
+        except Exception as ex:
+            logger.warning('Indian stocks batch fetch failed: %s', ex)
+
+    response = {
+        'stocks': results,
+        'updatedAt': datetime.utcnow().isoformat(),
+        'count': len(results),
+    }
+    _indian_cache['data'] = response
+    _indian_cache['ts'] = now
+    return jsonify(response)
+
 @app.route('/api/stock/news')
 def get_stock_news():
     symbol = request.args.get('symbol', '')

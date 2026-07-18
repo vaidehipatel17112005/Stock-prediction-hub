@@ -23,6 +23,7 @@ import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Profile from '@/pages/Profile';
 import Admin from '@/pages/Admin';
+import IndianStocks from '@/pages/IndianStocks';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,6 +67,7 @@ function Router() {
           <Route path="/portfolio" component={Portfolio} />
           <Route path="/about" component={About} />
           <Route path="/news" component={News} />
+          <Route path="/indian-stocks" component={IndianStocks} />
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
           

@@ -22,6 +22,7 @@ export function Navbar() {
   const links = [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/predict", label: "Predict" },
+    { href: "/indian-stocks", label: "🇮🇳 India" },
     { href: "/indicators", label: "Indicators" },
     { href: "/compare", label: "Compare" },
     { href: "/portfolio", label: "Portfolio" },

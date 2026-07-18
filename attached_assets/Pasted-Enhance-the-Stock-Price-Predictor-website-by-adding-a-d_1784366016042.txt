@@ -1,0 +1,93 @@
+Enhance the Stock Price Predictor website by adding a dedicated "Top Indian Stocks" section featuring the most popular NSE and BSE listed companies. Display each stock as a modern clickable card with the company logo (if available), company name, NSE ticker symbol, sector, current price, daily percentage change (green/red), market capitalization, and a "Predict Price" button. When a user clicks any stock card, automatically load its historical data, display interactive charts, and run the machine learning prediction model.
+
+Include the following Indian stocks:
+Banking & Financial Services
+HDFC Bank (HDFCBANK.NS)
+ICICI Bank (ICICIBANK.NS)
+State Bank of India (SBIN.NS)
+Axis Bank (AXISBANK.NS)
+Kotak Mahindra Bank (KOTAKBANK.NS)
+IndusInd Bank (INDUSINDBK.NS)
+Bajaj Finance (BAJFINANCE.NS)
+Bajaj Finserv (BAJAJFINSV.NS)
+Information Technology
+Tata Consultancy Services (TCS.NS)
+Infosys (INFY.NS)
+Wipro (WIPRO.NS)
+HCL Technologies (HCLTECH.NS)
+Tech Mahindra (TECHM.NS)
+LTIMindtree (LTIM.NS)
+Persistent Systems (PERSISTENT.NS)
+Oil & Energy
+Reliance Industries (RELIANCE.NS)
+ONGC (ONGC.NS)
+BPCL (BPCL.NS)
+Indian Oil Corporation (IOC.NS)
+GAIL (GAIL.NS)
+NTPC (NTPC.NS)
+Power Grid (POWERGRID.NS)
+Tata Power (TATAPOWER.NS)
+Adani Green Energy (ADANIGREEN.NS)
+Adani Power (ADANIPOWER.NS)
+Automobile
+Maruti Suzuki (MARUTI.NS)
+Tata Motors (TATAMOTORS.NS)
+Mahindra & Mahindra (M&M.NS)
+Hero MotoCorp (HEROMOTOCO.NS)
+Bajaj Auto (BAJAJ-AUTO.NS)
+Eicher Motors (EICHERMOT.NS)
+Consumer Goods
+Hindustan Unilever (HINDUNILVR.NS)
+ITC (ITC.NS)
+Nestlé India (NESTLEIND.NS)
+Britannia Industries (BRITANNIA.NS)
+Dabur India (DABUR.NS)
+Godrej Consumer Products (GODREJCP.NS)
+Tata Consumer Products (TATACONSUM.NS)
+Pharmaceuticals
+Sun Pharmaceutical (SUNPHARMA.NS)
+Dr. Reddy's Laboratories (DRREDDY.NS)
+Cipla (CIPLA.NS)
+Divi's Laboratories (DIVISLAB.NS)
+Lupin (LUPIN.NS)
+Aurobindo Pharma (AUROPHARMA.NS)
+Infrastructure & Engineering
+Larsen & Toubro (LT.NS)
+Siemens India (SIEMENS.NS)
+ABB India (ABB.NS)
+Cummins India (CUMMINSIND.NS)
+Telecom
+Bharti Airtel (BHARTIARTL.NS)
+Vodafone Idea (IDEA.NS)
+Cement
+UltraTech Cement (ULTRACEMCO.NS)
+Shree Cement (SHREECEM.NS)
+ACC (ACC.NS)
+Ambuja Cements (AMBUJACEM.NS)
+Metals & Mining
+Tata Steel (TATASTEEL.NS)
+JSW Steel (JSWSTEEL.NS)
+Hindalco (HINDALCO.NS)
+Coal India (COALINDIA.NS)
+Vedanta (VEDL.NS)
+Insurance
+Life Insurance Corporation of India (LICI.NS)
+SBI Life Insurance (SBILIFE.NS)
+HDFC Life Insurance (HDFCLIFE.NS)
+ICICI Prudential Life (ICICIPRULI.NS)
+Adani Group
+Adani Enterprises (ADANIENT.NS)
+Adani Ports (ADANIPORTS.NS)
+Adani Energy Solutions (ADANIENSOL.NS)
+Adani Total Gas (ATGL.NS)
+Dashboard Features
+Search by company name or ticker symbol.
+Filter stocks by sector.
+Sort by Market Cap, Price, Daily Gain/Loss, Volume, and Alphabetically.
+Display Top Gainers, Top Losers, and Most Active stocks.
+Show trending stocks in a horizontal scrolling carousel.
+Add a "Favorite" (⭐) button for quick access.
+Show mini sparkline charts on each stock card.
+Use green colors for positive changes and red for negative changes.
+Automatically refresh stock data every 30–60 seconds.
+Include responsive cards with hover animations, glassmorphism effects, and dark/light mode compatibility.
