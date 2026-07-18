@@ -3,20 +3,34 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: AI Stock Price Predictor API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: stock
+    description: Stock data operations
+  - name: ml
+    description: Machine learning operations
+  - name: auth
+    description: Authentication
+  - name: user
+    description: User management
+  - name: portfolio
+    description: Portfolio simulation
+  - name: admin
+    description: Admin operations
+  - name: export
+    description: Export operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +38,526 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /stock/info:
+    get:
+      operationId: getStockInfo
+      tags: [stock]
+      summary: Get stock info by symbol
+      parameters:
+        - name: symbol
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Stock info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockInfo"
+        "404":
+          description: Symbol not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stock/history:
+    get:
+      operationId: getStockHistory
+      tags: [stock]
+      summary: Get historical OHLCV data
+      parameters:
+        - name: symbol
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: end
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: interval
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "1d"
+      responses:
+        "200":
+          description: Historical OHLCV data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockHistoryResponse"
+
+  /stock/market-overview:
+    get:
+      operationId: getMarketOverview
+      tags: [stock]
+      summary: Get market overview (indices, crypto, commodities)
+      responses:
+        "200":
+          description: Market overview data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketOverviewResponse"
+
+  /stock/news:
+    get:
+      operationId: getStockNews
+      tags: [stock]
+      summary: Get latest stock market news
+      parameters:
+        - name: symbol
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: News articles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewsResponse"
+
+  /stock/indicators:
+    get:
+      operationId: getTechnicalIndicators
+      tags: [stock]
+      summary: Get technical indicators for a stock
+      parameters:
+        - name: symbol
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: end
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Technical indicators
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TechnicalIndicatorsResponse"
+
+  /stock/search:
+    get:
+      operationId: searchStocks
+      tags: [stock]
+      summary: Search stock symbols
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockSearchResponse"
+
+  /ml/train:
+    post:
+      operationId: trainModel
+      tags: [ml]
+      summary: Train an ML model on stock data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrainInput"
+      responses:
+        "200":
+          description: Training job started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainJobResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /ml/train/{jobId}/status:
+    get:
+      operationId: getTrainStatus
+      tags: [ml]
+      summary: Get training job status
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Training job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainStatusResponse"
+
+  /ml/predict:
+    post:
+      operationId: makePrediction
+      tags: [ml]
+      summary: Make price predictions using trained model
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PredictionInput"
+      responses:
+        "200":
+          description: Prediction results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PredictionResponse"
+
+  /ml/models:
+    get:
+      operationId: listModels
+      tags: [ml]
+      summary: List all saved/trained models
+      responses:
+        "200":
+          description: List of models
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelListResponse"
+
+  /ml/models/{modelId}:
+    delete:
+      operationId: deleteModel
+      tags: [ml]
+      summary: Delete a trained model
+      parameters:
+        - name: modelId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /ml/compare:
+    post:
+      operationId: compareModels
+      tags: [ml]
+      summary: Compare multiple ML models on the same data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompareInput"
+      responses:
+        "200":
+          description: Comparison results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompareResponse"
+
+  /data/upload-info:
+    get:
+      operationId: getUploadedData
+      tags: [stock]
+      summary: Get info about uploaded datasets
+      responses:
+        "200":
+          description: Uploaded datasets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadListResponse"
+
+  /portfolio/simulate:
+    post:
+      operationId: simulatePortfolio
+      tags: [portfolio]
+      summary: Simulate portfolio performance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortfolioInput"
+      responses:
+        "200":
+          description: Simulation results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortfolioResponse"
+
+  /auth/register:
+    post:
+      operationId: registerUser
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: loginUser
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logoutUser
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /user/history:
+    get:
+      operationId: getPredictionHistory
+      tags: [user]
+      summary: Get user's prediction history
+      responses:
+        "200":
+          description: Prediction history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PredictionHistoryResponse"
+
+  /user/watchlist:
+    get:
+      operationId: getWatchlist
+      tags: [user]
+      summary: Get user watchlist
+      responses:
+        "200":
+          description: Watchlist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchlistResponse"
+    post:
+      operationId: addToWatchlist
+      tags: [user]
+      summary: Add stock to watchlist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WatchlistInput"
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchlistItem"
+
+  /user/watchlist/{symbol}:
+    delete:
+      operationId: removeFromWatchlist
+      tags: [user]
+      summary: Remove stock from watchlist
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      tags: [admin]
+      summary: Admin - list all users
+      responses:
+        "200":
+          description: Users list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUsersResponse"
+
+  /admin/users/{userId}:
+    delete:
+      operationId: adminDeleteUser
+      tags: [admin]
+      summary: Admin - delete a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/stats:
+    get:
+      operationId: adminGetStats
+      tags: [admin]
+      summary: Admin - get server and usage stats
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStatsResponse"
+
+  /export/pdf:
+    post:
+      operationId: exportPdf
+      tags: [export]
+      summary: Export prediction report as PDF
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportInput"
+      responses:
+        "200":
+          description: PDF export URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportResponse"
+
+  /export/csv:
+    post:
+      operationId: exportCsv
+      tags: [export]
+      summary: Export data as CSV
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportInput"
+      responses:
+        "200":
+          description: CSV export URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +568,920 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+
+    StockInfo:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        currentPrice:
+          type: number
+        previousClose:
+          type: number
+        openPrice:
+          type: number
+        dayHigh:
+          type: number
+        dayLow:
+          type: number
+        volume:
+          type: integer
+        marketCap:
+          type: ["number", "null"]
+        percentChange:
+          type: number
+        week52High:
+          type: number
+        week52Low:
+          type: number
+        currency:
+          type: string
+        exchange:
+          type: string
+        sector:
+          type: ["string", "null"]
+        industry:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+      required:
+        - symbol
+        - name
+        - currentPrice
+        - previousClose
+        - openPrice
+        - dayHigh
+        - dayLow
+        - volume
+        - percentChange
+        - week52High
+        - week52Low
+        - currency
+        - exchange
+
+    OHLCVDataPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        open:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        close:
+          type: number
+        volume:
+          type: integer
+        adjClose:
+          type: ["number", "null"]
+      required:
+        - date
+        - open
+        - high
+        - low
+        - close
+        - volume
+
+    StockHistoryResponse:
+      type: object
+      properties:
+        symbol:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OHLCVDataPoint"
+        count:
+          type: integer
+      required:
+        - symbol
+        - data
+        - count
+
+    MarketItem:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+        change:
+          type: number
+        changePercent:
+          type: number
+        category:
+          type: string
+      required:
+        - symbol
+        - name
+        - price
+        - change
+        - changePercent
+        - category
+
+    MarketOverviewResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MarketItem"
+        updatedAt:
+          type: string
+      required:
+        - items
+        - updatedAt
+
+    NewsItem:
+      type: object
+      properties:
+        title:
+          type: string
+        summary:
+          type: string
+        url:
+          type: string
+        source:
+          type: string
+        publishedAt:
+          type: string
+        sentiment:
+          type: ["string", "null"]
+      required:
+        - title
+        - url
+        - source
+        - publishedAt
+
+    NewsResponse:
+      type: object
+      properties:
+        articles:
+          type: array
+          items:
+            $ref: "#/components/schemas/NewsItem"
+      required:
+        - articles
+
+    TechnicalIndicatorsResponse:
+      type: object
+      properties:
+        symbol:
+          type: string
+        dates:
+          type: array
+          items:
+            type: string
+        rsi:
+          type: array
+          items:
+            type: ["number", "null"]
+        macd:
+          type: array
+          items:
+            type: ["number", "null"]
+        macdSignal:
+          type: array
+          items:
+            type: ["number", "null"]
+        macdHistogram:
+          type: array
+          items:
+            type: ["number", "null"]
+        bollingerUpper:
+          type: array
+          items:
+            type: ["number", "null"]
+        bollingerMiddle:
+          type: array
+          items:
+            type: ["number", "null"]
+        bollingerLower:
+          type: array
+          items:
+            type: ["number", "null"]
+        sma20:
+          type: array
+          items:
+            type: ["number", "null"]
+        sma50:
+          type: array
+          items:
+            type: ["number", "null"]
+        sma100:
+          type: array
+          items:
+            type: ["number", "null"]
+        sma200:
+          type: array
+          items:
+            type: ["number", "null"]
+        ema20:
+          type: array
+          items:
+            type: ["number", "null"]
+        stochK:
+          type: array
+          items:
+            type: ["number", "null"]
+        stochD:
+          type: array
+          items:
+            type: ["number", "null"]
+        atr:
+          type: array
+          items:
+            type: ["number", "null"]
+        adx:
+          type: array
+          items:
+            type: ["number", "null"]
+        close:
+          type: array
+          items:
+            type: number
+      required:
+        - symbol
+        - dates
+        - close
+
+    StockSearchResult:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        exchange:
+          type: string
+        type:
+          type: string
+      required:
+        - symbol
+        - name
+        - exchange
+        - type
+
+    StockSearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockSearchResult"
+      required:
+        - results
+
+    TrainInput:
+      type: object
+      properties:
+        symbol:
+          type: string
+        modelType:
+          type: string
+          enum: [linear_regression, decision_tree, random_forest, svr, knn, xgboost, lstm]
+        startDate:
+          type: string
+        endDate:
+          type: string
+        predictionDays:
+          type: integer
+          default: 30
+        features:
+          type: array
+          items:
+            type: string
+        testSplitRatio:
+          type: number
+          default: 0.2
+        normalize:
+          type: boolean
+          default: true
+        removeNullValues:
+          type: boolean
+          default: true
+      required:
+        - symbol
+        - modelType
+
+    TrainJobResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+        message:
+          type: string
+      required:
+        - jobId
+        - status
+
+    TrainStatusResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+        progress:
+          type: number
+        message:
+          type: string
+        metrics:
+          $ref: "#/components/schemas/ModelMetrics"
+        modelId:
+          type: ["string", "null"]
+        elapsedTime:
+          type: ["number", "null"]
+        estimatedRemaining:
+          type: ["number", "null"]
+        datasetStats:
+          $ref: "#/components/schemas/DatasetStats"
+      required:
+        - jobId
+        - status
+        - progress
+        - message
+
+    ModelMetrics:
+      type: object
+      properties:
+        r2Score:
+          type: number
+        mae:
+          type: number
+        rmse:
+          type: number
+        mse:
+          type: number
+        accuracy:
+          type: number
+        trainingTime:
+          type: number
+        testingTime:
+          type: number
+      required:
+        - r2Score
+        - mae
+        - rmse
+        - mse
+        - accuracy
+        - trainingTime
+        - testingTime
+
+    DatasetStats:
+      type: object
+      properties:
+        totalRows:
+          type: integer
+        trainingRows:
+          type: integer
+        testingRows:
+          type: integer
+        features:
+          type: integer
+        startDate:
+          type: string
+        endDate:
+          type: string
+        missingValues:
+          type: integer
+      required:
+        - totalRows
+        - trainingRows
+        - testingRows
+        - features
+        - startDate
+        - endDate
+        - missingValues
+
+    PredictionInput:
+      type: object
+      properties:
+        modelId:
+          type: string
+        symbol:
+          type: string
+        days:
+          type: integer
+          default: 30
+      required:
+        - modelId
+        - symbol
+
+    PredictionPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        predictedPrice:
+          type: number
+        actualPrice:
+          type: ["number", "null"]
+        confidenceUpper:
+          type: ["number", "null"]
+        confidenceLower:
+          type: ["number", "null"]
+      required:
+        - date
+        - predictedPrice
+
+    PredictionResponse:
+      type: object
+      properties:
+        symbol:
+          type: string
+        modelId:
+          type: string
+        modelType:
+          type: string
+        predictions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PredictionPoint"
+        historicalVsPredicted:
+          type: array
+          items:
+            $ref: "#/components/schemas/PredictionPoint"
+        nextDayPrice:
+          type: number
+        weekPrice:
+          type: number
+        monthPrice:
+          type: number
+        yearlyTrend:
+          type: string
+        recommendation:
+          type: string
+        confidenceScore:
+          type: number
+        sentiment:
+          type: string
+        metrics:
+          $ref: "#/components/schemas/ModelMetrics"
+        featureImportance:
+          type: ["object", "null"]
+          additionalProperties:
+            type: number
+      required:
+        - symbol
+        - modelId
+        - modelType
+        - predictions
+        - historicalVsPredicted
+        - nextDayPrice
+        - weekPrice
+        - monthPrice
+        - yearlyTrend
+        - recommendation
+        - confidenceScore
+        - sentiment
+        - metrics
+
+    ModelInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        symbol:
+          type: string
+        modelType:
+          type: string
+        createdAt:
+          type: string
+        metrics:
+          $ref: "#/components/schemas/ModelMetrics"
+        predictionDays:
+          type: integer
+        trainingDataRange:
+          type: string
+      required:
+        - id
+        - symbol
+        - modelType
+        - createdAt
+        - predictionDays
+
+    ModelListResponse:
+      type: object
+      properties:
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelInfo"
+      required:
+        - models
+
+    CompareInput:
+      type: object
+      properties:
+        symbol:
+          type: string
+        models:
+          type: array
+          items:
+            type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        predictionDays:
+          type: integer
+      required:
+        - symbol
+        - models
+
+    ModelComparisonResult:
+      type: object
+      properties:
+        modelType:
+          type: string
+        metrics:
+          $ref: "#/components/schemas/ModelMetrics"
+        predictions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PredictionPoint"
+      required:
+        - modelType
+        - metrics
+        - predictions
+
+    CompareResponse:
+      type: object
+      properties:
+        symbol:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelComparisonResult"
+      required:
+        - symbol
+        - results
+
+    UploadedDataset:
+      type: object
+      properties:
+        dataId:
+          type: string
+        filename:
+          type: string
+        rows:
+          type: integer
+        columns:
+          type: array
+          items:
+            type: string
+        uploadedAt:
+          type: string
+      required:
+        - dataId
+        - filename
+        - rows
+        - columns
+        - uploadedAt
+
+    UploadListResponse:
+      type: object
+      properties:
+        datasets:
+          type: array
+          items:
+            $ref: "#/components/schemas/UploadedDataset"
+      required:
+        - datasets
+
+    PortfolioInput:
+      type: object
+      properties:
+        symbol:
+          type: string
+        investmentAmount:
+          type: number
+        purchaseDate:
+          type: string
+        modelId:
+          type: ["string", "null"]
+      required:
+        - symbol
+        - investmentAmount
+        - purchaseDate
+
+    PortfolioDataPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        value:
+          type: number
+        shares:
+          type: number
+      required:
+        - date
+        - value
+        - shares
+
+    PortfolioResponse:
+      type: object
+      properties:
+        symbol:
+          type: string
+        investmentAmount:
+          type: number
+        currentValue:
+          type: number
+        profitLoss:
+          type: number
+        roi:
+          type: number
+        shares:
+          type: number
+        purchasePrice:
+          type: number
+        currentPrice:
+          type: number
+        growthData:
+          type: array
+          items:
+            $ref: "#/components/schemas/PortfolioDataPoint"
+      required:
+        - symbol
+        - investmentAmount
+        - currentValue
+        - profitLoss
+        - roi
+        - shares
+        - purchasePrice
+        - currentPrice
+        - growthData
+
+    RegisterInput:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        fullName:
+          type: string
+      required:
+        - username
+        - email
+        - password
+
+    LoginInput:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        fullName:
+          type: ["string", "null"]
+        role:
+          type: string
+        createdAt:
+          type: string
+        predictionsCount:
+          type: integer
+      required:
+        - id
+        - username
+        - email
+        - role
+        - createdAt
+        - predictionsCount
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - token
+        - user
+
+    PredictionHistoryItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        symbol:
+          type: string
+        modelType:
+          type: string
+        createdAt:
+          type: string
+        metrics:
+          $ref: "#/components/schemas/ModelMetrics"
+        recommendation:
+          type: string
+        confidenceScore:
+          type: number
+      required:
+        - id
+        - symbol
+        - modelType
+        - createdAt
+        - recommendation
+        - confidenceScore
+
+    PredictionHistoryResponse:
+      type: object
+      properties:
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/PredictionHistoryItem"
+      required:
+        - history
+
+    WatchlistItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        symbol:
+          type: string
+        name:
+          type: string
+        addedAt:
+          type: string
+        currentPrice:
+          type: ["number", "null"]
+        percentChange:
+          type: ["number", "null"]
+      required:
+        - id
+        - symbol
+        - name
+        - addedAt
+
+    WatchlistResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WatchlistItem"
+      required:
+        - items
+
+    WatchlistInput:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+      required:
+        - symbol
+        - name
+
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        createdAt:
+          type: string
+        predictionsCount:
+          type: integer
+        lastLogin:
+          type: ["string", "null"]
+      required:
+        - id
+        - username
+        - email
+        - role
+        - createdAt
+        - predictionsCount
+
+    AdminUsersResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUser"
+        total:
+          type: integer
+      required:
+        - users
+        - total
+
+    AdminStatsResponse:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        totalPredictions:
+          type: integer
+        totalModels:
+          type: integer
+        totalUploads:
+          type: integer
+        activeJobs:
+          type: integer
+        serverUptime:
+          type: number
+        memoryUsage:
+          type: number
+        cpuUsage:
+          type: number
+        popularSymbols:
+          type: array
+          items:
+            type: object
+            properties:
+              symbol:
+                type: string
+              count:
+                type: integer
+      required:
+        - totalUsers
+        - totalPredictions
+        - totalModels
+        - totalUploads
+        - activeJobs
+        - serverUptime
+        - memoryUsage
+        - cpuUsage
+        - popularSymbols
+
+    ExportInput:
+      type: object
+      properties:
+        symbol:
+          type: string
+        modelId:
+          type: ["string", "null"]
+        includeCharts:
+          type: boolean
+          default: true
+        dateRange:
+          type: ["string", "null"]
+      required:
+        - symbol
+
+    ExportResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        filename:
+          type: string
+        size:
+          type: integer
+      required:
+        - url
+        - filename
+        - size
