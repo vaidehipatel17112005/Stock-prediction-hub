@@ -21,6 +21,8 @@ from flask_cors import CORS
 import warnings
 warnings.filterwarnings('ignore')
 
+import db  # PostgreSQL persistence layer
+
 # ── Logging ────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
@@ -32,36 +34,18 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB
 
 CORS(app, supports_credentials=True, origins='*')
 
-# ── In-memory stores (replace with DB in production) ───────────────────────
-users_db = {}          # id -> user dict
-sessions_db = {}       # token -> user_id
-watchlists_db = {}     # user_id -> [WatchlistItem]
-prediction_history_db = {}  # user_id -> [PredictionHistoryItem]
-train_jobs = {}        # job_id -> status dict
-saved_models = {}      # model_id -> model metadata
-uploaded_data = {}     # data_id -> dataframe info
-admin_logs = []
+# ── Runtime-only stores (ML jobs & models stay in-memory) ──────────────────
+train_jobs = {}    # job_id -> status dict
+saved_models = {}  # model_id -> model metadata + sklearn object
+uploaded_data = {} # data_id -> dataframe info
 
 start_time = time.time()
-next_user_id = 1
 
-# Seed admin user
-def _hash_pw(pw):
-    return hashlib.sha256(pw.encode()).hexdigest()
-
-users_db[1] = {
-    'id': 1, 'username': 'admin', 'email': 'admin@stockai.com',
-    'password': _hash_pw('admin123'), 'fullName': 'Admin User',
-    'role': 'admin', 'createdAt': datetime.utcnow().isoformat(),
-    'predictionsCount': 0, 'lastLogin': None
-}
-users_db[2] = {
-    'id': 2, 'username': 'demo', 'email': 'demo@stockai.com',
-    'password': _hash_pw('demo123'), 'fullName': 'Demo User',
-    'role': 'user', 'createdAt': datetime.utcnow().isoformat(),
-    'predictionsCount': 12, 'lastLogin': datetime.utcnow().isoformat()
-}
-next_user_id = 3
+# Initialise DB schema + seed users on startup
+try:
+    db.init_schema()
+except Exception as _db_err:
+    logger.error('DB init error: %s', _db_err)
 
 # ── Auth helpers ────────────────────────────────────────────────────────────
 def get_token_from_request():
@@ -74,10 +58,10 @@ def get_current_user():
     token = get_token_from_request()
     if not token:
         return None
-    user_id = sessions_db.get(token)
+    user_id = db.get_session_user_id(token)
     if not user_id:
         return None
-    return users_db.get(user_id)
+    return db.get_user_by_id(user_id)
 
 def require_auth(f):
     @wraps(f)
@@ -98,13 +82,6 @@ def require_admin(f):
         g.current_user = user
         return f(*args, **kwargs)
     return decorated
-
-def user_to_dict(u):
-    return {
-        'id': u['id'], 'username': u['username'], 'email': u['email'],
-        'fullName': u.get('fullName'), 'role': u['role'],
-        'createdAt': u['createdAt'], 'predictionsCount': u.get('predictionsCount', 0)
-    }
 
 # ── Stock data helpers ──────────────────────────────────────────────────────
 def get_yfinance():
@@ -971,22 +948,18 @@ def make_prediction():
         return jsonify({'error': f'Model {model_id} not found'}), 404
     try:
         result = run_prediction(model_info, symbol, days)
-        # Log to prediction history
+        # Log to prediction history in DB
         user = get_current_user()
         if user:
-            uid = user['id']
-            if uid not in prediction_history_db:
-                prediction_history_db[uid] = []
-            hist_item = {
-                'id': len(prediction_history_db[uid]) + 1,
-                'symbol': symbol.upper(), 'modelType': model_info['modelType'],
-                'createdAt': datetime.utcnow().isoformat(),
-                'metrics': result['metrics'],
-                'recommendation': result['recommendation'],
-                'confidenceScore': result['confidenceScore'],
-            }
-            prediction_history_db[uid].insert(0, hist_item)
-            users_db[uid]['predictionsCount'] = users_db[uid].get('predictionsCount', 0) + 1
+            try:
+                db.log_prediction(
+                    user['id'], symbol, model_info['modelType'],
+                    result.get('metrics') or {},
+                    result.get('recommendation'),
+                    result.get('confidenceScore'),
+                )
+            except Exception as _log_err:
+                logger.warning('Failed to log prediction: %s', _log_err)
         return jsonify(result)
     except Exception as e:
         logger.exception(e)
@@ -1116,125 +1089,122 @@ def simulate_portfolio():
 # Auth routes
 @app.route('/api/auth/register', methods=['POST'])
 def register():
-    global next_user_id
     data = request.get_json() or {}
-    username = data.get('username', '').strip()
-    email = data.get('email', '').strip().lower()
-    password = data.get('password', '')
+    username  = data.get('username', '').strip()
+    email     = data.get('email', '').strip().lower()
+    password  = data.get('password', '')
     full_name = data.get('fullName', '').strip()
     if not username or not email or not password:
         return jsonify({'error': 'username, email and password are required'}), 400
-    if any(u['email'] == email for u in users_db.values()):
-        return jsonify({'error': 'Email already registered'}), 400
-    user = {
-        'id': next_user_id, 'username': username, 'email': email,
-        'password': _hash_pw(password), 'fullName': full_name or None,
-        'role': 'user', 'createdAt': datetime.utcnow().isoformat(),
-        'predictionsCount': 0, 'lastLogin': None,
-    }
-    users_db[next_user_id] = user
-    next_user_id += 1
+    try:
+        user = db.create_user(username, email, password, full_name or None)
+    except Exception as e:
+        if 'unique' in str(e).lower():
+            return jsonify({'error': 'Email or username already registered'}), 400
+        logger.exception(e)
+        return jsonify({'error': 'Registration failed'}), 500
     token = str(uuid.uuid4())
-    sessions_db[token] = user['id']
-    return jsonify({'token': token, 'user': user_to_dict(user)}), 201
+    db.create_session(token, user['id'])
+    return jsonify({'token': token, 'user': db.user_to_dict(user)}), 201
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    data = request.get_json() or {}
-    email = data.get('email', '').strip().lower()
+    data     = request.get_json() or {}
+    email    = data.get('email', '').strip().lower()
     password = data.get('password', '')
-    user = next((u for u in users_db.values() if u['email'] == email), None)
-    if not user or user['password'] != _hash_pw(password):
+    user = db.get_user_by_email(email)
+    if not user or user['password_hash'] != db.hash_pw(password):
         return jsonify({'error': 'Invalid email or password'}), 401
     token = str(uuid.uuid4())
-    sessions_db[token] = user['id']
-    users_db[user['id']]['lastLogin'] = datetime.utcnow().isoformat()
-    return jsonify({'token': token, 'user': user_to_dict(user)})
+    db.create_session(token, user['id'])
+    db.touch_last_login(user['id'])
+    return jsonify({'token': token, 'user': db.user_to_dict(user)})
 
 @app.route('/api/auth/logout', methods=['POST'])
 def logout():
     token = get_token_from_request()
-    if token in sessions_db:
-        del sessions_db[token]
+    if token:
+        db.delete_session(token)
     return jsonify({'success': True, 'message': 'Logged out'})
 
 @app.route('/api/auth/me')
 @require_auth
 def get_me():
-    return jsonify(user_to_dict(g.current_user))
+    return jsonify(db.user_to_dict(g.current_user))
 
 # User routes
 @app.route('/api/user/history')
 @require_auth
 def get_history():
     uid = g.current_user['id']
-    return jsonify({'history': prediction_history_db.get(uid, [])})
+    return jsonify({'history': db.get_prediction_history(uid)})
 
 @app.route('/api/user/watchlist')
 @require_auth
 def get_watchlist():
-    uid = g.current_user['id']
-    items = watchlists_db.get(uid, [])
-    # Refresh prices
-    for item in items:
+    uid   = g.current_user['id']
+    rows  = db.get_watchlist(uid)
+    items = []
+    for row in rows:
+        item = {
+            'id':           row['id'],
+            'symbol':       row['symbol'],
+            'name':         row.get('name') or row['symbol'],
+            'addedAt':      row['added_at'].isoformat() if hasattr(row.get('added_at'), 'isoformat') else str(row.get('added_at', '')),
+            'currentPrice': None,
+            'percentChange': None,
+        }
         try:
-            info = fetch_stock_info(item['symbol'])
-            item['currentPrice'] = info['currentPrice']
+            info = fetch_stock_info(row['symbol'])
+            item['currentPrice']  = info['currentPrice']
             item['percentChange'] = info['percentChange']
         except Exception:
             pass
+        items.append(item)
     return jsonify({'items': items})
 
 @app.route('/api/user/watchlist', methods=['POST'])
 @require_auth
 def add_watchlist():
-    uid = g.current_user['id']
+    uid  = g.current_user['id']
     data = request.get_json() or {}
     symbol = data.get('symbol', '').strip().upper()
-    name = data.get('name', symbol)
+    name   = data.get('name', symbol)
     if not symbol:
         return jsonify({'error': 'symbol required'}), 400
-    if uid not in watchlists_db:
-        watchlists_db[uid] = []
-    existing = [w for w in watchlists_db[uid] if w['symbol'] == symbol]
-    if existing:
-        return jsonify(existing[0]), 200
-    item = {
-        'id': len(watchlists_db[uid]) + 1, 'symbol': symbol, 'name': name,
-        'addedAt': datetime.utcnow().isoformat(), 'currentPrice': None, 'percentChange': None,
-    }
-    watchlists_db[uid].append(item)
-    return jsonify(item), 201
+    row = db.add_to_watchlist(uid, symbol, name)
+    return jsonify({
+        'id':           row['id'],
+        'symbol':       row['symbol'],
+        'name':         row.get('name') or row['symbol'],
+        'addedAt':      row['added_at'].isoformat() if hasattr(row.get('added_at'), 'isoformat') else str(row.get('added_at', '')),
+        'currentPrice': None,
+        'percentChange': None,
+    }), 201
 
 @app.route('/api/user/watchlist/<symbol>', methods=['DELETE'])
 @require_auth
 def remove_watchlist(symbol):
     uid = g.current_user['id']
-    watchlists_db[uid] = [w for w in watchlists_db.get(uid, []) if w['symbol'] != symbol.upper()]
+    db.remove_from_watchlist(uid, symbol)
     return jsonify({'success': True, 'message': 'Removed from watchlist'})
 
 # Admin routes
 @app.route('/api/admin/users')
 @require_admin
 def admin_list_users():
-    all_users = []
-    for u in users_db.values():
-        all_users.append({
-            'id': u['id'], 'username': u['username'], 'email': u['email'],
-            'role': u['role'], 'createdAt': u['createdAt'],
-            'predictionsCount': u.get('predictionsCount', 0),
-            'lastLogin': u.get('lastLogin'),
-        })
-    return jsonify({'users': all_users, 'total': len(all_users)})
+    users = db.get_all_users()
+    return jsonify({'users': users, 'total': len(users)})
 
 @app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
 @require_admin
 def admin_delete_user(user_id):
     if user_id == g.current_user['id']:
         return jsonify({'error': 'Cannot delete yourself'}), 400
-    if user_id not in users_db:
+    target = db.get_user_by_id(user_id)
+    if not target:
         return jsonify({'error': 'User not found'}), 404
-    del users_db[user_id]
+    db.delete_user(user_id)
     return jsonify({'success': True, 'message': 'User deleted'})
 
 @app.route('/api/admin/stats')
@@ -1247,23 +1217,16 @@ def admin_stats():
     except Exception:
         cpu, mem = 0.0, 0.0
 
-    sym_count = {}
-    for uid_items in prediction_history_db.values():
-        for item in uid_items:
-            s = item['symbol']
-            sym_count[s] = sym_count.get(s, 0) + 1
-    popular = [{'symbol': s, 'count': c} for s, c in sorted(sym_count.items(), key=lambda x: -x[1])[:5]]
-
     return jsonify({
-        'totalUsers': len(users_db),
-        'totalPredictions': sum(u.get('predictionsCount', 0) for u in users_db.values()),
-        'totalModels': len(saved_models),
-        'totalUploads': len(uploaded_data),
-        'activeJobs': sum(1 for j in train_jobs.values() if j['status'] == 'running'),
-        'serverUptime': round(time.time() - start_time, 2),
-        'memoryUsage': mem,
-        'cpuUsage': cpu,
-        'popularSymbols': popular,
+        'totalUsers':       db.get_total_users(),
+        'totalPredictions': db.get_total_predictions(),
+        'totalModels':      len(saved_models),
+        'totalUploads':     len(uploaded_data),
+        'activeJobs':       sum(1 for j in train_jobs.values() if j['status'] == 'running'),
+        'serverUptime':     round(time.time() - start_time, 2),
+        'memoryUsage':      mem,
+        'cpuUsage':         cpu,
+        'popularSymbols':   db.get_popular_symbols(5),
     })
 
 # Export routes
